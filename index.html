@@ -48,6 +48,9 @@
         <form id="task-form" class="composer">
           <input id="f-title" type="text" placeholder="เพิ่มงาน/โครงการใหม่… เช่น ออกแบบระบบสมาชิก" required autocomplete="off">
           <div class="composer-row">
+            <select id="f-parent" title="เป็นงานย่อยของโครงการไหน (เว้นว่างถ้าเป็นโครงการใหม่)">
+              <option value="">— โครงการใหม่ —</option>
+            </select>
             <select id="f-assignee" required></select>
             <label class="mini-label">เริ่ม <input id="f-start" type="date" required></label>
             <label class="mini-label">ถึง <input id="f-end" type="date" required></label>
@@ -89,6 +92,7 @@
 
       <label class="modal-field-label">ความคืบหน้า: <span id="modal-progress-val">0%</span></label>
       <input type="range" id="modal-progress" min="0" max="100" step="5">
+      <p id="modal-auto-note" class="modal-auto-note hidden">คำนวณอัตโนมัติจากค่าเฉลี่ยของงานย่อย ไปอัปเดต % ที่งานย่อยแทน</p>
 
       <div class="modal-datefields">
         <label class="mini-label">เริ่ม <input id="modal-start" type="date"></label>

@@ -130,12 +130,28 @@ button { font-family: inherit; cursor: pointer; }
   padding-top: 56px; /* header height */
 }
 .gantt-row-label {
-  height: 44px; display: flex; align-items: center; gap: 8px;
-  padding: 0 12px; border-bottom: 1px solid #F0EFEB; font-size: 13px; cursor: pointer;
+  height: 44px; display: flex; align-items: center; gap: 6px;
+  padding: 0 10px; border-bottom: 1px solid #F0EFEB; font-size: 13px; cursor: pointer;
 }
 .gantt-row-label:hover { background: var(--bg); }
+.gantt-row-label:hover .add-sub-btn { opacity: 1; }
+.gantt-row-label.is-child { padding-left: 30px; background: #FCFCFA; }
+.gantt-row-label.is-child .avatar { width: 18px; height: 18px; font-size: 9px; }
+.gantt-row-label.is-child .row-title { font-weight: 400; color: var(--muted); }
 .gantt-row-label .avatar { width: 22px; height: 22px; font-size: 10px; }
-.row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; flex: 1; }
+.chevron-btn {
+  width: 16px; height: 16px; flex-shrink: 0; border: none; background: none;
+  color: var(--muted); font-size: 10px; padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.chevron-btn:hover { color: var(--primary); }
+.chevron-spacer { width: 16px; flex-shrink: 0; }
+.add-sub-btn {
+  width: 18px; height: 18px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1; padding: 0;
+  opacity: 0; transition: opacity .15s; display: flex; align-items: center; justify-content: center;
+}
+.add-sub-btn:hover { border-color: var(--primary); color: var(--primary); opacity: 1; }
 
 .gantt-scroll { overflow-x: auto; flex: 1; }
 .gantt-timeline { position: relative; }
@@ -166,6 +182,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .gantt-bar:hover { transform: translateY(-1px); box-shadow: 0 4px 10px -4px rgba(0,0,0,0.25); }
 .gantt-bar.overdue { border-color: var(--red) !important; }
+.gantt-bar.is-parent-bar { border-width: 2px; font-weight: 600; }
+.gantt-bar.is-child-bar { border-style: dashed; }
 .gantt-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px 0 0 5px; opacity: 0.9; }
 .gantt-bar-pct { position: relative; margin-left: 8px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ink); z-index: 1; }
 
@@ -186,7 +204,9 @@ button { font-family: inherit; cursor: pointer; }
 .modal-title { font-family: var(--font-display); font-size: 20px; margin: 0 0 8px; }
 .modal-dates { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-bottom: 20px; }
 .modal-field-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
-.modal input[type="range"] { width: 100%; margin-bottom: 20px; accent-color: var(--primary); }
+.modal input[type="range"] { width: 100%; margin-bottom: 8px; accent-color: var(--primary); }
+.modal input[type="range"]:disabled { opacity: 0.4; }
+.modal-auto-note { font-size: 12px; color: var(--muted); margin: 0 0 16px; font-style: italic; }
 .modal-datefields { display: flex; gap: 14px; margin-bottom: 24px; }
 .modal-datefields input { border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-family: inherit; font-size: 13px; width: 100%; }
 .modal-actions { display: flex; justify-content: space-between; gap: 10px; }

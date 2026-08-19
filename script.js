@@ -14,6 +14,7 @@ let currentUser = localStorage.getItem(USER_KEY) || null;
 let activePersonFilter = "all";
 let zoom = "week"; // "day" | "week"
 let editingId = null;
+let collapsedIds = new Set();
 
 /* ---------- Firebase (or localStorage fallback) ---------- */
 let db = null;
@@ -119,6 +120,16 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+function getChildren(id) {
+  return tasks.filter(t => t.parentId === id);
+}
+function effectiveProgress(t) {
+  const kids = getChildren(t.id);
+  if (kids.length) {
+    return Math.round(kids.reduce((s, k) => s + (k.progress || 0), 0) / kids.length);
+  }
+  return t.progress || 0;
+}
 
 /* ---------- gate ---------- */
 function renderGate() {
@@ -153,6 +164,15 @@ function populateAssigneeSelect() {
   sel.innerHTML = TEAM.map(name => `<option value="${name}">${name}</option>`).join("");
   if (currentUser) sel.value = currentUser;
 }
+function populateParentSelect(preselectId) {
+  const sel = document.getElementById("f-parent");
+  const topLevel = tasks.filter(t => !t.parentId);
+  const current = preselectId !== undefined ? preselectId : sel.value;
+  sel.innerHTML = `<option value="">— โครงการใหม่ —</option>` +
+    topLevel.map(t => `<option value="${t.id}">↳ งานย่อยของ: ${escapeHtml(t.title)}</option>`).join("");
+  sel.value = current || "";
+}
+
 function populatePersonFilter() {
   const wrap = document.getElementById("person-filter");
   wrap.innerHTML = `<button class="chip active" data-person="all">ทุกคน</button>`;
@@ -185,32 +205,58 @@ document.getElementById("task-form").addEventListener("submit", async (e) => {
   const assignee = document.getElementById("f-assignee").value;
   const start = document.getElementById("f-start").value;
   const end = document.getElementById("f-end").value;
+  const parentId = document.getElementById("f-parent").value || null;
   if (!title || !start || !end) return;
   if (end < start) { alert("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม"); return; }
 
   await addTask({
     title, assignee, start, end,
     progress: 0,
+    parentId,
     createdBy: currentUser,
     createdAt: new Date().toISOString()
   });
+  const keepParent = document.getElementById("f-parent").value;
   e.target.reset();
+  document.getElementById("f-start").value = todayISO();
+  document.getElementById("f-end").value = addDays(todayISO(), 3);
   populateAssigneeSelect();
+  populateParentSelect(keepParent);
 });
+
+function focusAddSubtask(parentId) {
+  populateParentSelect(parentId);
+  document.getElementById("f-title").scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById("f-title").focus();
+}
 
 /* ---------- modal ---------- */
 function openModal(id) {
   const t = tasks.find(x => x.id === id);
   if (!t) return;
   editingId = id;
+  const kids = getChildren(t.id);
+  const isAutoParent = kids.length > 0;
+  const shownProgress = effectiveProgress(t);
+
+  const parentTitle = t.parentId ? tasks.find(x => x.id === t.parentId)?.title : null;
   document.getElementById("modal-assignee").innerHTML =
-    `<span class="avatar" style="background:${colorFor(t.assignee)};width:18px;height:18px;font-size:9px;display:inline-flex;vertical-align:-3px;margin-right:6px;">${initials(t.assignee)}</span>${t.assignee}`;
+    `<span class="avatar" style="background:${colorFor(t.assignee)};width:18px;height:18px;font-size:9px;display:inline-flex;vertical-align:-3px;margin-right:6px;">${initials(t.assignee)}</span>${t.assignee}` +
+    (parentTitle ? ` &nbsp;·&nbsp; งานย่อยของ ${escapeHtml(parentTitle)}` : "");
   document.getElementById("modal-title").textContent = t.title;
   document.getElementById("modal-dates").textContent = `${formatShort(t.start)} → ${formatShort(t.end)}`;
-  document.getElementById("modal-progress").value = t.progress;
-  document.getElementById("modal-progress-val").textContent = t.progress + "%";
+
+  const progressInput = document.getElementById("modal-progress");
+  progressInput.value = shownProgress;
+  progressInput.disabled = isAutoParent;
+  document.getElementById("modal-progress-val").textContent = shownProgress + "%";
+  document.getElementById("modal-auto-note").classList.toggle("hidden", !isAutoParent);
+
   document.getElementById("modal-start").value = t.start;
   document.getElementById("modal-end").value = t.end;
+  document.getElementById("modal-delete").textContent = kids.length
+    ? `ลบงานนี้ (พร้อมงานย่อย ${kids.length} รายการ)`
+    : "ลบงานนี้";
   document.getElementById("modal-backdrop").classList.remove("hidden");
 }
 function closeModal() {
@@ -226,16 +272,25 @@ document.getElementById("modal-progress").addEventListener("input", (e) => {
 });
 document.getElementById("modal-save").addEventListener("click", async () => {
   if (!editingId) return;
-  const progress = Number(document.getElementById("modal-progress").value);
+  const t = tasks.find(x => x.id === editingId);
   const start = document.getElementById("modal-start").value;
   const end = document.getElementById("modal-end").value;
   if (end < start) { alert("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม"); return; }
-  await updateTask(editingId, { progress, start, end });
+  const patch = { start, end };
+  if (!getChildren(editingId).length) {
+    patch.progress = Number(document.getElementById("modal-progress").value);
+  }
+  await updateTask(editingId, patch);
   closeModal();
 });
 document.getElementById("modal-delete").addEventListener("click", async () => {
   if (!editingId) return;
-  if (confirm("ลบงานนี้ออกจากแผนงานใช่ไหม?")) {
+  const kids = getChildren(editingId);
+  const msg = kids.length
+    ? `ลบงานนี้จะลบงานย่อยทั้ง ${kids.length} รายการด้วย ใช่ไหม?`
+    : "ลบงานนี้ออกจากแผนงานใช่ไหม?";
+  if (confirm(msg)) {
+    for (const k of kids) await deleteTask(k.id);
     await deleteTask(editingId);
     closeModal();
   }
@@ -243,14 +298,15 @@ document.getElementById("modal-delete").addEventListener("click", async () => {
 
 /* ---------- rendering ---------- */
 function render() {
+  populateParentSelect();
   renderOverallProgress();
   renderGantt();
 }
 
 function renderOverallProgress() {
-  const list = tasks;
-  const pct = list.length
-    ? Math.round(list.reduce((s, t) => s + (t.progress || 0), 0) / list.length)
+  const topLevel = tasks.filter(t => !t.parentId);
+  const pct = topLevel.length
+    ? Math.round(topLevel.reduce((s, t) => s + effectiveProgress(t), 0) / topLevel.length)
     : 0;
   document.getElementById("overall-fill").style.width = pct + "%";
   document.getElementById("overall-pct").textContent = pct + "%";
@@ -261,8 +317,22 @@ function renderGantt() {
   const timeline = document.getElementById("gantt-timeline");
   const empty = document.getElementById("empty-state");
 
-  let list = tasks.filter(t => activePersonFilter === "all" || t.assignee === activePersonFilter);
-  list = [...list].sort((a, b) => a.start.localeCompare(b.start));
+  const matches = (t) => activePersonFilter === "all" || t.assignee === activePersonFilter;
+
+  let topLevel = tasks.filter(t => !t.parentId);
+  topLevel = topLevel.filter(t => matches(t) || getChildren(t.id).some(matches));
+  topLevel.sort((a, b) => a.start.localeCompare(b.start));
+
+  // build flat ordered list with isChild flag, respecting collapse + person filter
+  const list = [];
+  topLevel.forEach(p => {
+    list.push({ ...p, isChild: false, hasChildren: getChildren(p.id).length > 0 });
+    if (!collapsedIds.has(p.id)) {
+      let kids = getChildren(p.id).sort((a, b) => a.start.localeCompare(b.start));
+      if (activePersonFilter !== "all") kids = kids.filter(matches);
+      kids.forEach(k => list.push({ ...k, isChild: true, hasChildren: false }));
+    }
+  });
 
   if (list.length === 0) {
     side.innerHTML = "";
@@ -284,11 +354,31 @@ function renderGantt() {
 
   // ---- side (task list) ----
   side.innerHTML = list.map(t => `
-    <div class="gantt-row-label" data-id="${t.id}" style="height:${rowHeight}px">
+    <div class="gantt-row-label ${t.isChild ? "is-child" : ""}" data-id="${t.id}" style="height:${rowHeight}px">
+      ${t.hasChildren
+        ? `<button class="chevron-btn" data-toggle="${t.id}">${collapsedIds.has(t.id) ? "▸" : "▾"}</button>`
+        : (t.isChild ? `<span class="chevron-spacer"></span>` : `<span class="chevron-spacer"></span>`)
+      }
       <span class="avatar" style="background:${colorFor(t.assignee)}">${initials(t.assignee)}</span>
       <span class="row-title">${escapeHtml(t.title)}</span>
+      ${!t.isChild ? `<button class="add-sub-btn" data-add-sub="${t.id}" title="เพิ่มงานย่อย">+</button>` : ""}
     </div>
   `).join("");
+
+  side.querySelectorAll(".chevron-btn").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = el.dataset.toggle;
+      collapsedIds.has(id) ? collapsedIds.delete(id) : collapsedIds.add(id);
+      render();
+    });
+  });
+  side.querySelectorAll(".add-sub-btn").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      focusAddSubtask(el.dataset.addSub);
+    });
+  });
 
   // ---- timeline header ----
   let headerHtml = `<div class="gantt-header" style="width:${totalDays * dayWidth}px">`;
@@ -334,12 +424,15 @@ function renderGantt() {
     const left = offset * dayWidth;
     const width = Math.max(span * dayWidth - 4, dayWidth - 4);
     const top = rowIdx * rowHeight + 8;
-    const overdue = t.end < today && t.progress < 100;
+    const prog = effectiveProgress(t);
+    const overdue = t.end < today && prog < 100;
+    const barHeight = t.isChild ? 22 : 28;
+    const topAdj = t.isChild ? top + 3 : top;
     gridHtml += `
-      <div class="gantt-bar ${overdue ? "overdue" : ""}" data-id="${t.id}"
-           style="left:${left}px; top:${top}px; width:${width}px; background:${colorFor(t.assignee)}22; border-color:${colorFor(t.assignee)};">
-        <div class="gantt-bar-fill" style="width:${t.progress}%; background:${colorFor(t.assignee)};"></div>
-        <span class="gantt-bar-pct">${t.progress}%</span>
+      <div class="gantt-bar ${overdue ? "overdue" : ""} ${t.hasChildren ? "is-parent-bar" : ""} ${t.isChild ? "is-child-bar" : ""}" data-id="${t.id}"
+           style="left:${left}px; top:${topAdj}px; width:${width}px; height:${barHeight}px; background:${colorFor(t.assignee)}22; border-color:${colorFor(t.assignee)};">
+        <div class="gantt-bar-fill" style="width:${prog}%; background:${colorFor(t.assignee)};"></div>
+        <span class="gantt-bar-pct">${prog}%</span>
       </div>`;
   });
   gridHtml += `</div>`;
@@ -359,6 +452,7 @@ function renderGantt() {
 
 /* ---------- init ---------- */
 populateAssigneeSelect();
+populateParentSelect();
 populatePersonFilter();
 renderGate();
 initData();
