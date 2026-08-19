@@ -3,19 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>โต๊ะงาน — Team Task Board</title>
+<title>แผนงาน — Team Gantt</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+  <!-- Connection status (Firebase not configured yet) -->
+  <div id="setup-banner" class="setup-banner hidden">
+    <strong>ยังไม่ได้ตั้งค่าฐานข้อมูลกลาง</strong> — เปิดไฟล์ <code>firebase-config.js</code> แล้วใส่ค่าจาก Firebase Console ของคุณ ตอนนี้ข้อมูลจะเก็บในเครื่องนี้เครื่องเดียวชั่วคราว ดูวิธีทำใน README.md
+  </div>
+
   <!-- Who-am-I gate -->
   <div id="gate" class="gate">
     <div class="gate-card">
-      <p class="eyebrow">โต๊ะงาน</p>
+      <p class="eyebrow">แผนงาน</p>
       <h1>คุณคือใคร?</h1>
-      <p class="gate-sub">เลือกชื่อของคุณเพื่อเริ่มใช้งาน ไม่ต้องใช้รหัสผ่าน</p>
+      <p class="gate-sub">เลือกชื่อของคุณเพื่อเริ่มอัปเดตงาน ทุกคนเห็นข้อมูลชุดเดียวกันแบบเรียลไทม์</p>
       <div id="gate-names" class="gate-names"></div>
     </div>
   </div>
@@ -23,57 +28,82 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">โต๊ะงาน</span>
-        <span class="brand-sub">Team Task Board</span>
+        <span class="brand-mark">แผนงาน</span>
+        <span class="brand-sub">Team Gantt</span>
+      </div>
+      <div class="overall-progress" id="overall-progress">
+        <span class="overall-label">ความคืบหน้ารวม</span>
+        <div class="overall-track"><div class="overall-fill" id="overall-fill"></div></div>
+        <span class="overall-pct" id="overall-pct">0%</span>
       </div>
       <div class="whoami">
-        <span class="whoami-label">คุณคือ</span>
-        <span id="whoami-name" class="whoami-name"></span>
+        <span id="sync-dot" class="sync-dot" title="สถานะการซิงก์"></span>
+        <span class="whoami-name" id="whoami-name"></span>
         <button id="switch-user" class="link-btn">เปลี่ยนคน</button>
       </div>
     </header>
 
-    <!-- Signature: workload strip -->
-    <section class="workload" aria-label="ภาระงานของแต่ละคน">
-      <div id="workload-bars" class="workload-bars"></div>
-    </section>
-
     <main class="main">
       <section class="composer-wrap">
         <form id="task-form" class="composer">
-          <input id="f-title" type="text" placeholder="เพิ่มงานใหม่… เช่น ทำสไลด์นำเสนอลูกค้า" required autocomplete="off">
+          <input id="f-title" type="text" placeholder="เพิ่มงาน/โครงการใหม่… เช่น ออกแบบระบบสมาชิก" required autocomplete="off">
           <div class="composer-row">
             <select id="f-assignee" required></select>
-            <input id="f-due" type="date">
-            <select id="f-priority">
-              <option value="normal">ปกติ</option>
-              <option value="high">ด่วน</option>
-            </select>
-            <button type="submit" class="btn-primary">เพิ่มงาน</button>
+            <label class="mini-label">เริ่ม <input id="f-start" type="date" required></label>
+            <label class="mini-label">ถึง <input id="f-end" type="date" required></label>
+            <button type="submit" class="btn-primary">เพิ่มลงแผนงาน</button>
           </div>
         </form>
       </section>
 
       <section class="controls">
-        <div class="tabs" id="status-tabs">
-          <button class="tab active" data-filter="all">ทั้งหมด</button>
-          <button class="tab" data-filter="todo">ยังไม่ทำ</button>
-          <button class="tab" data-filter="doing">กำลังทำ</button>
-          <button class="tab" data-filter="done">เสร็จแล้ว</button>
-        </div>
         <div class="person-filter" id="person-filter">
           <button class="chip active" data-person="all">ทุกคน</button>
         </div>
+        <div class="zoom-toggle" id="zoom-toggle">
+          <button class="zoom-btn" data-zoom="day">วัน</button>
+          <button class="zoom-btn active" data-zoom="week">สัปดาห์</button>
+        </div>
       </section>
 
-      <section class="board" id="board">
-        <!-- task cards injected here -->
+      <section class="gantt-wrap">
+        <div class="gantt" id="gantt">
+          <div class="gantt-side" id="gantt-side"></div>
+          <div class="gantt-scroll" id="gantt-scroll">
+            <div class="gantt-timeline" id="gantt-timeline"></div>
+          </div>
+        </div>
       </section>
 
-      <p id="empty-state" class="empty-state hidden">ยังไม่มีงานในหมวดนี้ — เริ่มเพิ่มงานแรกได้เลย</p>
+      <p id="empty-state" class="empty-state hidden">ยังไม่มีงานในแผนงาน — เริ่มเพิ่มงานแรกได้เลย</p>
     </main>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Task detail / update-progress modal -->
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <button id="modal-close" class="modal-close" aria-label="ปิด">×</button>
+      <p class="eyebrow" id="modal-assignee"></p>
+      <h2 id="modal-title" class="modal-title"></h2>
+      <div class="modal-dates" id="modal-dates"></div>
+
+      <label class="modal-field-label">ความคืบหน้า: <span id="modal-progress-val">0%</span></label>
+      <input type="range" id="modal-progress" min="0" max="100" step="5">
+
+      <div class="modal-datefields">
+        <label class="mini-label">เริ่ม <input id="modal-start" type="date"></label>
+        <label class="mini-label">ถึง <input id="modal-end" type="date"></label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="modal-delete" class="btn-ghost-danger">ลบงานนี้</button>
+        <button id="modal-save" class="btn-primary">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase (modular v9 via CDN) -->
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
