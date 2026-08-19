@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>โต๊ะงาน — Team Task Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Who-am-I gate -->
+  <div id="gate" class="gate">
+    <div class="gate-card">
+      <p class="eyebrow">โต๊ะงาน</p>
+      <h1>คุณคือใคร?</h1>
+      <p class="gate-sub">เลือกชื่อของคุณเพื่อเริ่มใช้งาน ไม่ต้องใช้รหัสผ่าน</p>
+      <div id="gate-names" class="gate-names"></div>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">โต๊ะงาน</span>
+        <span class="brand-sub">Team Task Board</span>
+      </div>
+      <div class="whoami">
+        <span class="whoami-label">คุณคือ</span>
+        <span id="whoami-name" class="whoami-name"></span>
+        <button id="switch-user" class="link-btn">เปลี่ยนคน</button>
+      </div>
+    </header>
+
+    <!-- Signature: workload strip -->
+    <section class="workload" aria-label="ภาระงานของแต่ละคน">
+      <div id="workload-bars" class="workload-bars"></div>
+    </section>
+
+    <main class="main">
+      <section class="composer-wrap">
+        <form id="task-form" class="composer">
+          <input id="f-title" type="text" placeholder="เพิ่มงานใหม่… เช่น ทำสไลด์นำเสนอลูกค้า" required autocomplete="off">
+          <div class="composer-row">
+            <select id="f-assignee" required></select>
+            <input id="f-due" type="date">
+            <select id="f-priority">
+              <option value="normal">ปกติ</option>
+              <option value="high">ด่วน</option>
+            </select>
+            <button type="submit" class="btn-primary">เพิ่มงาน</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="controls">
+        <div class="tabs" id="status-tabs">
+          <button class="tab active" data-filter="all">ทั้งหมด</button>
+          <button class="tab" data-filter="todo">ยังไม่ทำ</button>
+          <button class="tab" data-filter="doing">กำลังทำ</button>
+          <button class="tab" data-filter="done">เสร็จแล้ว</button>
+        </div>
+        <div class="person-filter" id="person-filter">
+          <button class="chip active" data-person="all">ทุกคน</button>
+        </div>
+      </section>
+
+      <section class="board" id="board">
+        <!-- task cards injected here -->
+      </section>
+
+      <p id="empty-state" class="empty-state hidden">ยังไม่มีงานในหมวดนี้ — เริ่มเพิ่มงานแรกได้เลย</p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
